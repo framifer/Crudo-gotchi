@@ -149,6 +149,10 @@ h1, h2 { font-size: 0.9rem; text-align: center; color: #3a4653; text-transform: 
 .classic-btn { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #b34a2a; background: radial-gradient(circle at 35% 30%, #ff8a5c, #e0532a); color: #fff; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 0 #a83e1e; }
 .classic-btn:active { transform: translateY(4px); box-shadow: none; }
 .classic-mini-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #3c566c; cursor: pointer; padding: 0; }
+/* Tastino REBOOT gommoso rosso acceso sulla scocca del tamagotchi */
+#btn-shell-reboot { position: absolute; top: 30px; right: 30px; width: 26px; height: 26px; border-radius: 50%; padding: 0; cursor: pointer; z-index: 20; border: 2px solid #7a0f0f; background: radial-gradient(circle at 34% 28%, #ff6b5a 0%, #ff2a1a 45%, #c40d0d 100%); box-shadow: 0 3px 0 #7a0f0f, inset 0 2px 3px rgba(255,255,255,0.55), inset 0 -2px 3px rgba(0,0,0,0.3); transition: transform 0.05s, box-shadow 0.05s; }
+#btn-shell-reboot:active { transform: translateY(3px); box-shadow: 0 0 0 #7a0f0f, inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -2px 3px rgba(0,0,0,0.3); }
+@media (max-width: 480px) { #btn-shell-reboot { top: 16px; right: 16px; } }
 #btn-classic-back { background: radial-gradient(circle at 35% 30%, #6a869e, #45627a); box-shadow: 0 3px 0 #2c4152; }
 #btn-classic-preview { background: radial-gradient(circle at 35% 30%, #a8ad78, #6a6e3a); border-color: #4f5228; box-shadow: 0 3px 0 #4f5228; }
 .classic-mini-btn:active { transform: translateY(3px); box-shadow: none; }
@@ -221,7 +225,8 @@ h1, h2 { font-size: 0.9rem; text-align: center; color: #3a4653; text-transform: 
 <g id="icon-fit"><path d="M0 2h2v4H0zM6 2h2v4H6zM2 3h4v2H2z" fill="#6e6ea8"/></g>
 <g id="icon-int"><path d="M4 0L0 2l4 2 4-2-4-2zM2 3.5v2.5c0 1 1 1.5 2 1.5s2-.5 2-1.5V3.5M7 2.5v3.5" fill="#4a9a8f"/></g>
 </svg>
-<div class="tamagotchi-container" id="shell-container">
+<div class="tamagotchi-container" id="shell-container" style="position:relative;">
+<button id="btn-shell-reboot" onclick="shellReboot()" title="Reboot / Riavvia" aria-label="Reboot"></button>
 <div class="lcd-screen" id="lcd-screen">
 
 <div id="mode-screen" style="width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
@@ -1039,9 +1044,35 @@ if(classic.stage>=1&&classic.stage<4&&classic.secStage>=CLASSIC_T_STAGE){classic
 else if(classic.stage===4&&classic.secStage>=CLASSIC_T_STAGE*2){classicDie(sim);return;}
 if(classic.health<=0){classicDie(sim);return;}}
 
-function classicCatchUp(){const ns=Math.floor(Date.now()/1000);let el=ns-(classic.lastTs||ns);if(el<=0){classic.lastTs=ns;return;}if(el>86400*30)el=86400*30;for(let i=0;i<el;i++){classic.lastTs++;classicStep(true);if(classic.isDead)break;}classic.lastTs=ns;}
+/* Applica in blocco 'sec' secondi al pet Classic (anti-freeze, no iterazione secondo-per-secondo). */
+function classicBulkElapsed(sec){if(!classic||classic.isDead||sec<=0)return;
+classic.totalSec+=sec;classic.secStage+=sec;classic.ageDays=Math.floor(classic.totalSec/86400);
+if(classic.stage===0){ // uovo: si schiude comunque
+if(classic.secStage>=CLASSIC_T_EGG){classic.stage=1;classic.secStage=0;}
+}
+if(!classic.isSleeping&&classic.stage>0){
+// decadimento fame/felicita aggregato
+classic.hunger=Math.max(0,classic.hunger-Math.floor(sec/CLASSIC_DECAY.hunger));
+classic.happy=Math.max(0,classic.happy-Math.floor(sec/CLASSIC_DECAY.happy));
+// cacca accumulata
+const poops=Math.floor(sec/CLASSIC_POOP_INT);if(poops>0){classic.poopCount=Math.min(4,(classic.poopCount||0)+poops);if(classic.poopCount>0){classic.isDirty=true;if(!classic.dirtySince)classic.dirtySince=classic.totalSec;}classic.lastPoopSec=classic.totalSec;}
+// malattia prolungata: perdita salute aggregata
+if(classic.isSick){classic.health=Math.max(0,classic.health-Math.floor(sec/3600));}
+// morte per fame se a 0 abbastanza a lungo
+if(classic.hunger===0){classic.hungerZeroSec=(classic.hungerZeroSec||0)+sec;if(classic.hungerZeroSec>=CLASSIC_HUNGER_DEATH){classic.isDead=true;classic.stage=5;return;}}
+}else if(classic.isSleeping){classic.health=Math.min(4,classic.health);}
+// evoluzioni multiple saltate
+while(classic.stage>=1&&classic.stage<4&&classic.secStage>=CLASSIC_T_STAGE){classic.secStage-=CLASSIC_T_STAGE;classic.stage++;if(classic.stage===3)classic.teenVariant=(Math.random()<0.5?0:1);if(classic.stage===4)classic.adultVariant=classicPickAdult();}
+if(classic.stage===4&&classic.secStage>=CLASSIC_T_STAGE*2){classic.isDead=true;classic.stage=5;return;}
+if(classic.health<=0){classic.isDead=true;classic.stage=5;}}
 
-function classicTick(){if(!classic||classic.isDead)return;const ns=Math.floor(Date.now()/1000);let steps=ns-classic.lastTs;if(steps<1)steps=1;if(steps>86400*30)steps=86400*30;for(let i=0;i<steps;i++){classic.lastTs++;classicStep(i===steps-1?false:true);if(classic.isDead)break;}classic.lastTs=ns;
+function classicCatchUp(){const ns=Math.floor(Date.now()/1000);let el=ns-(classic.lastTs||ns);if(el<=0){classic.lastTs=ns;return;}if(el>86400*30)el=86400*30;
+const CAP=3600;if(el>CAP){const bulk=el-CAP;classicBulkElapsed(bulk);classic.lastTs+=bulk;el=CAP;}
+for(let i=0;i<el;i++){classic.lastTs++;classicStep(true);if(classic.isDead)break;}classic.lastTs=ns;}
+
+function classicTick(){if(!classic||classic.isDead)return;const ns=Math.floor(Date.now()/1000);let steps=ns-classic.lastTs;if(steps<1)steps=1;if(steps>86400*30)steps=86400*30;
+const CAP=3600;if(steps>CAP){const bulk=steps-CAP;classicBulkElapsed(bulk);classic.lastTs+=bulk;steps=CAP;}
+for(let i=0;i<steps;i++){classic.lastTs++;classicStep(i===steps-1?false:true);if(classic.isDead)break;}classic.lastTs=ns;
 if(!classic.isSleeping&&classic.stage>0&&classic.stage<5&&(classic.hunger<=1||classic.happy<=1||classic.isDirty||classic.isSick)){if(!classic._lastCall||Date.now()-classic._lastCall>18000){classic._lastCall=Date.now();playBeep(990,'square',0.05);setTimeout(()=>playBeep(990,'square',0.05),140);}}
 saveClassic();}
 
@@ -1524,7 +1555,7 @@ const pl=pressed?2:5;
 p(ox+8,oy,pl,3);
 p(ox+8+pl,oy-1,1,5);
 }
-function classicMsg(m){const e=document.getElementById('classic-msg');if(e)e.innerText='';}
+function classicMsg(m){const e=document.getElementById('classic-msg');if(e)e.innerText=(m==null?'':m);}
 
 let _bSwallow=false;
 function classicBPointerDown(e){if(classic&&classic.view==='jump'){if(e&&e.preventDefault)e.preventDefault();jumpDo();_bSwallow=true;}}
@@ -1754,9 +1785,6 @@ saveClassic();classicRender();setTimeout(()=>{if(classic.view==='whack'){classic
 
 function showModeScreen(){hideAllScreens();if(classicTimer)clearInterval(classicTimer);if(gameTimer)clearInterval(gameTimer);updateTexts();document.getElementById('mode-screen').style.display='flex';document.getElementById('mode-desc').innerText=i18n[currentLang].modeDesc;}
 function chooseMode(m){gameMode=m;localStorage.setItem('dinomio_mode',m);if(m==='classic'){document.getElementById('mode-screen').style.display='none';if(!loadClassic())startClassic();}else{document.getElementById('mode-screen').style.display='none';if(!loadGameState()){for(let p=0;p<5;p++)drawPixelSprite('p'+(p+1)+'_baby',p,1);document.getElementById('selection-screen').style.display='block';}}}
-
-function showModeScreen(){hideAllScreens();if(classicTimer)clearInterval(classicTimer);if(gameTimer)clearInterval(gameTimer);updateTexts();document.getElementById('mode-screen').style.display='flex';document.getElementById('mode-desc').innerText=i18n[currentLang].modeDesc;}
-function chooseMode(m){gameMode=m;localStorage.setItem('dinomio_mode',m);if(m==='classic'){document.getElementById('mode-screen').style.display='none';if(!loadClassic())startClassic();}else{document.getElementById('mode-screen').style.display='none';if(!loadGameState()){for(let p=0;p<5;p++)drawPixelSprite('p'+(p+1)+'_baby',p,1);document.getElementById('selection-screen').style.display='block';}}}
 function initPreviews(){for(let p=0;p<5;p++)drawPixelSprite('p'+(p+1)+'_baby',p,1);updateTexts();
 gameMode=localStorage.getItem('dinomio_mode')||'';
 document.getElementById('selection-screen').style.display='none';
@@ -1787,9 +1815,40 @@ if(petStage>0)exploreTickSeconds(sim);
 if(isSleeping&&petStage>0)energy=Math.min(100,energy+(20/3600));
 if(health<=0){isDead=true;petStage=5;if(!sim){turnOffSleepingState();document.getElementById('game-canvas').classList.remove('pet-idle-bounce');document.getElementById('game-canvas').classList.remove('pet-sick-anim');document.getElementById('action-msg').innerText=i18n[currentLang].deathMsg;generateLeaderboard();myRacePoints=0;lastRaceDay=raceDayIndex();if(gameTimer)clearInterval(gameTimer);saveGameState();}}}
 
-function catchUpRealTime(){const ns=Math.floor(Date.now()/1000);if(!lastRealTimestamp){lastRealTimestamp=ns;return;}let el=ns-lastRealTimestamp;if(el<=0)return;const MX=SECONDS_PER_DAY*30;if(el>MX)el=MX;for(let i=0;i<el;i++){lastRealTimestamp++;stepOneSecond(true);if(isDead)break;}lastRealTimestamp=ns;checkStatsWarning();}
+function catchUpRealTime(){const ns=Math.floor(Date.now()/1000);if(!lastRealTimestamp){lastRealTimestamp=ns;return;}let el=ns-lastRealTimestamp;if(el<=0)return;const MX=SECONDS_PER_DAY*30;if(el>MX)el=MX;
+// Anti-freeze: simuliamo al massimo STEP_CAP secondi "reali" (con eventi: poop, malattia,
+// evoluzione). Il tempo eccedente viene applicato in forma AGGREGATA cosi non blocchiamo
+// il thread con milioni di iterazioni dopo una lunga assenza.
+const STEP_CAP=3600; // 1h di simulazione dettagliata
+if(el>STEP_CAP){const bulk=el-STEP_CAP;applyBulkElapsed(bulk);lastRealTimestamp+=bulk;el=STEP_CAP;}
+for(let i=0;i<el;i++){lastRealTimestamp++;stepOneSecond(true);if(isDead)break;}lastRealTimestamp=ns;checkStatsWarning();}
 
-function gameLoop(){if(inRunnerMode||inRpsMode||raceActive)return;if(isDead)return;poopSmokeFrame++;const ns=Math.floor(Date.now()/1000);let steps=ns-lastRealTimestamp;if(steps<1)steps=1;if(steps>SECONDS_PER_DAY*30)steps=SECONDS_PER_DAY*30;for(let i=0;i<steps;i++){lastRealTimestamp++;stepOneSecond(i===steps-1?false:true);if(isDead)break;}lastRealTimestamp=ns;checkStatsWarning();applySickAnimClass();if(currentBgStyle==='real'&&!inExploreMode&&!isSleeping)drawBackground();if(inExploreMode)renderExplore();else updateDisplay();maybeShowRacePrompt();saveGameState();}
+/* Applica in blocco l'effetto di 'sec' secondi trascorsi, senza iterare secondo per secondo.
+   Avanza il tempo/eta/evoluzione e applica i decadimenti in forma aggregata (anti-freeze). */
+function applyBulkElapsed(sec){if(isDead||sec<=0)return;const T3=SECONDS_PER_DAY*3;
+// avanza tempo ed eta
+totalGameSeconds+=sec;secondsInCurrentStage+=sec;ageInDays=Math.floor(totalGameSeconds/SECONDS_PER_DAY);
+// evoluzione a tappe (gestisce anche piu' evoluzioni saltate)
+while(petStage>=1&&petStage<4&&secondsInCurrentStage>=T3){secondsInCurrentStage-=T3;petStage++;if(petStage===4)computeAdultForm();}
+if(petStage===4&&secondsInCurrentStage>=T3){triggerNaturalDeath(true);return;}
+// decadimenti aggregati: quante "tacche" da -20 sarebbero cadute
+if(petStage>0){
+const dec=(stat,base)=>Math.floor(sec/Math.max(1,Math.round(base/decayMult(stat))))*20;
+hunger=Math.max(0,hunger-dec('hunger',DECAY.hunger));
+cleanliness=Math.max(0,cleanliness-dec('cleanliness',DECAY.cleanliness));
+if(!isSleeping){happiness=Math.max(0,happiness-dec('happiness',DECAY.happiness));energy=Math.max(0,energy-dec('energy',DECAY.energy));}
+else{energy=Math.min(100,energy+Math.min(100,(sec*20/3600)));}
+fitness=Math.max(0,fitness-dec('fitness',DECAY.fitness));
+intelligence=Math.max(0,intelligence-dec('intelligence',DECAY.intelligence));
+// malattia prolungata non curata: perdita salute aggregata
+if(isSick){health=Math.max(0,health-Math.floor(sec/3600)*20);}
+if(health<=0){isDead=true;petStage=5;}
+}}
+
+function gameLoop(){if(inRunnerMode||inRpsMode||raceActive)return;if(isDead)return;poopSmokeFrame++;const ns=Math.floor(Date.now()/1000);let steps=ns-lastRealTimestamp;if(steps<1)steps=1;if(steps>SECONDS_PER_DAY*30)steps=SECONDS_PER_DAY*30;
+const STEP_CAP=3600; // anti-freeze: oltre 1h simulata, applica in blocco
+if(steps>STEP_CAP){const bulk=steps-STEP_CAP;applyBulkElapsed(bulk);lastRealTimestamp+=bulk;steps=STEP_CAP;}
+for(let i=0;i<steps;i++){lastRealTimestamp++;stepOneSecond(i===steps-1?false:true);if(isDead)break;}lastRealTimestamp=ns;checkStatsWarning();applySickAnimClass();if(currentBgStyle==='real'&&!inExploreMode&&!isSleeping)drawBackground();if(inExploreMode)renderExplore();else updateDisplay();maybeShowRacePrompt();saveGameState();}
 
 function triggerNaturalDeath(sim){isDead=true;petStage=5;if(sim){if(!gameTimer)return;}turnOffSleepingState();if(gameTimer)clearInterval(gameTimer);updateDisplay();const t=i18n[currentLang];document.getElementById('action-msg').innerText=t.deathRebirthMsg;
 setTimeout(()=>{const ni=Math.floor(Math.random()*5);const dn=["SPIKE","NIBBLE","BUBBLE","PUFF","DINO"];const pn=dn[ni];
@@ -1913,6 +1972,24 @@ function hideRules(){document.getElementById('rules-screen').style.display='none
 function showChooseArea(){document.getElementById('selection-screen').style.display='none';document.getElementById('choose-area-screen').style.display='flex';}
 function hideChooseArea(){document.getElementById('choose-area-screen').style.display='none';document.getElementById('selection-screen').style.display='block';}
 function navigateToLocation(l){playHappyEndSound();alert(i18n[currentLang].travelMsg+l);}
+/* REBOOT soft dalla scocca: salva lo stato, ferma i mini-giochi/timer, poi ricarica la pagina.
+   NON cancella i salvataggi: serve a sbloccare eventuali glitch riavviando il gioco. */
+function shellReboot(){
+try{
+// ferma eventuali mini-giochi attivi per evitare timer orfani
+if(typeof stopRunner==='function'&&inRunnerMode)stopRunner();
+if(typeof stopRpsGame==='function'&&inRpsMode)stopRpsGame();
+if(typeof stopMemoryGame==='function'&&inMemoryMode)stopMemoryGame();
+if(typeof classicGameExit==='function'&&classic&&(classic.view==='simon'||classic.view==='whack'))classicGameExit();
+if(typeof gameTimer!=='undefined'&&gameTimer)clearInterval(gameTimer);
+if(typeof classicTimer!=='undefined'&&classicTimer)clearInterval(classicTimer);
+// salva lo stato corrente della modalita attiva
+if(gameMode==='classic'){if(typeof saveClassic==='function'&&classic)saveClassic();}
+else{if(typeof saveGameState==='function'&&(typeof petStage!=='undefined')&&petStage!==undefined&&gameMode==='dinomio')saveGameState();}
+}catch(e){}
+playBeep(300,'square',0.06);setTimeout(()=>playBeep(500,'square',0.06),90);
+setTimeout(()=>location.reload(),200);
+}
 function resetGame(){if(!window.confirm(i18n[currentLang].resetConfirm))return;stopRunner();if(inRpsMode)stopRpsGame();if(inMemoryMode)stopMemoryGame();if(inExploreMode)closeExploreView();if(gameTimer)clearInterval(gameTimer);turnOffSleepingState();document.getElementById('race-prompt').style.display='none';raceActive=false;document.getElementById('race-container').style.display='none';clearGameState();generation=1;isDead=false;alarmPlayedThisWarning=false;achievements={};totalRacesWon=0;memoryCompletions=0;gems=0;ownedAccessories=[];equippedAccessory=null;adultForm="standard";careStats={gym:0,study:0,food:0};memoryLevel=1;leaderboard=[];myRacePoints=0;lastRaceDay=-1;exploreMap=null;exploreHoursLeft=0;exploreSecCounter=0;exploreTreasures=0;exploreFlowers=0;exploreFruits=0;currentBgStyle='basic';setBackgroundStyle('basic');const mc=document.getElementById('game-canvas');mc.classList.remove('egg-wobble');mc.classList.remove('pet-idle-bounce');mc.classList.remove('pet-sick-anim');mc.style.display='block';document.getElementById('gameplay-screen').style.display='none';document.getElementById('info-screen').style.display='none';document.getElementById('settings-screen').style.display='none';document.getElementById('rules-screen').style.display='none';document.getElementById('choose-area-screen').style.display='none';document.getElementById('shop-screen').style.display='none';document.getElementById('selection-screen').style.display='block';}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!isDead&&petStage!==undefined){const gp=document.getElementById('gameplay-screen');if(gp&&gp.style.display!=='none'&&!inRunnerMode&&!inRpsMode&&!raceActive){catchUpRealTime();applySickAnimClass();if(inExploreMode)renderExplore();else updateDisplay();maybeShowRacePrompt();saveGameState();}}});
 window.onload=initPreviews;
