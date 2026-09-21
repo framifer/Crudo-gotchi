@@ -4,10 +4,10 @@ const CACHE_NAME = 'crudo-gotchi-v1';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png'
+  './manifest (1).json',
+  './icon-192 (1).png',
+  './icon-512 (2).png',
+  './icon-maskable-512 (1).png'
 ];
 
 // Installazione: pre-cache dei file principali
@@ -38,7 +38,6 @@ self.addEventListener('fetch', (event) => {
       if (cached) return cached;
       return fetch(event.request)
         .then((response) => {
-          // Salva in cache le nuove richieste GET riuscite (stesso origine)
           if (
             response &&
             response.status === 200 &&
