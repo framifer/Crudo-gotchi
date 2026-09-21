@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Sfondo -->
+  <rect width="512" height="512" fill="#12181f"/>
+  <!-- Scocca del Tamagotchi -->
+  <rect x="86" y="46" width="340" height="420" rx="70" fill="#93a7bd" stroke="#6a809a" stroke-width="14"/>
+  <!-- Schermo LCD -->
+  <rect x="140" y="120" width="232" height="200" rx="18" fill="#c2d2ca" stroke="#5f7a72" stroke-width="10"/>
+  <!-- Pet 8-bit (blocco) sullo schermo -->
+  <g fill="#20301a">
+    <rect x="216" y="176" width="80" height="80" rx="8"/>
+    <rect x="200" y="192" width="16" height="48"/>
+    <rect x="296" y="192" width="16" height="48"/>
+  </g>
+  <!-- Occhi -->
+  <rect x="230" y="198" width="14" height="14" fill="#c2d2ca"/>
+  <rect x="268" y="198" width="14" height="14" fill="#c2d2ca"/>
+  <!-- Bocca -->
+  <rect x="240" y="232" width="32" height="8" fill="#c2d2ca"/>
+  <!-- Pulsanti -->
+  <circle cx="196" cy="392" r="26" fill="#e0532a" stroke="#a83e1e" stroke-width="6"/>
+  <circle cx="256" cy="392" r="26" fill="#e0532a" stroke="#a83e1e" stroke-width="6"/>
+  <circle cx="316" cy="392" r="26" fill="#e0532a" stroke="#a83e1e" stroke-width="6"/>
+</svg>
